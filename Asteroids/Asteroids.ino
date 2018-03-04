@@ -8,11 +8,11 @@
   License as published by the Free Software Foundation; either
   version 2.1 of the License, or (at your option) any later version.
 */
-#include <avr/pgmspace.h>
-#include <TVout.h>
-#include <video_gen.h>
-#include <EEPROM.h>
-#include <Controllers.h>
+//#include <avr/pgmspace.h>
+//#include <TVout.h>
+//#include <video_gen.h>
+//#include <EEPROM.h>
+//#include <Controllers.h>
 #include "Asteroids.h"
 #include "title_bitmap.h"
 #include "hackvision_logo_bitmap.h"
@@ -26,6 +26,12 @@
 #include "ship_explosion_bitmaps.h"
 #include "explosion_frequencies.h"
 #include "asteroids_font.h"
+#include <Arduboy2.h>
+
+#define W (WIDTH)
+#define H (HEIGHT)
+
+Arduboy2 arduboy;
 
 //#define DEBUG
 
@@ -39,7 +45,10 @@ byte oldShipX, oldShipY;
 byte thrustX, thrustY;
 unsigned long clock;
 unsigned long nextHeartbeat;
-char hyperspaceCount;
+
+// hyperspaceCount has to be a signed integer
+int hyperspaceCount = -1;
+
 byte level = 1;
 byte nAsteroids;
 volatile unsigned int freq;
@@ -47,10 +56,6 @@ volatile byte sound;
 byte explosionFreqIndex = 0;
 byte heartbeatFreq;
 uint32_t LOW_FREQ_OCR = F_CPU / 2 / 1024;
-
-TVout tv;
-
-
 
 Asteroid asteroids[MAX_ASTEROIDS];
 Shot shots[MAX_SHOTS];
@@ -74,34 +79,58 @@ unsigned long debugTime = 2000;
 // Higher number (like 1.5) slow the game down.  Lower numbers (like 0.6) speed it up.
 float speedAdjust = 1.0;
 
-const char s0[] PROGMEM = "ASTEROIDS";
-const char s1[] PROGMEM = "HIGH SCORES";
-const char s2[] PROGMEM = "GAME";
-const char s3[] PROGMEM = "OVER";
+// const char s0[] = "ASTEROIDS";
+// const char s1[] = "HIGH SCORES";
+// const char s2[] = "GAME";
+// const char s3[] = "OVER";
 
-const char* const strings[] PROGMEM = {s0, s1, s2, s3};
-
+//  const char* const strings[] PROGMEM = {s0, s1, s2, s3};
 
 void setup()  {
 
   // If pin 12 is pulled LOW, then the PAL jumper is shorted.
-  pinMode(12, INPUT);
-  digitalWrite(12, HIGH);
+  //pinMode(12, INPUT);
+  //digitalWrite(12, HIGH);
 
-  if (digitalRead(12) == LOW) {
-    tv.begin(_PAL, W, H);
-    // Since PAL processing is faster, we need to slow the game play down.
-    speedAdjust = 1.1;
-  } else {
-    tv.begin(_NTSC, W, H);
-  }
+  //if (digitalRead(12) == LOW) {
+  //  tv.begin(_PAL, W, H);
+  //  // Since PAL processing is faster, we need to slow the game play down.
+  //  speedAdjust = 1.1;
+  //} else {
+  //  tv.begin(_NTSC, W, H);
+  //}
 
-  tv.select_font(asteroids_font);
+  arduboy.boot();
+
+  arduboy.setTextSize(1);
+  arduboy.setTextColor(WHITE);
+  arduboy.setTextColor(BLACK);
+  // tv.select_font(asteroids_font);
   randomSeed(analogRead(0));
 
-  tv.set_vbi_hook(&soundISR);
+  // tv.set_vbi_hook(&soundISR);
 
   initGame(false);
+}
+
+int downPressed() {
+  return arduboy.pressed(DOWN_BUTTON);
+}
+
+int upPressed() {
+  return arduboy.pressed(UP_BUTTON);
+}
+
+int leftPressed() {
+  return arduboy.pressed(LEFT_BUTTON);
+}
+
+int rightPressed() {
+  return arduboy.pressed(RIGHT_BUTTON);
+}
+
+int firePressed() {
+  return arduboy.pressed(A_BUTTON);
 }
 
 void drawAsteroid(Asteroid a) {
@@ -378,7 +407,8 @@ void moveShots() {
     }
 
     if (shots[i].ttl < SHOT_TTL) {
-      tv.set_pixel(shots[i].x, shots[i].y, 0);
+      arduboy.drawPixel(shots[i].x, shots[i].y, BLACK);
+      // display.drawPixel(shots[i].x, shots[i].y, 0);
     }
 
     if (shots[i].ttl == 0) {
@@ -388,18 +418,21 @@ void moveShots() {
     }
     shots[i].ttl--;
     moveShot(&shots[i]);
-    tv.set_pixel(shots[i].x, shots[i].y, 1);
+    arduboy.drawPixel(shots[i].x, shots[i].y, WHITE);
+    // display.drawPixel(shots[i].x, shots[i].y, 1);
   }
 
   if (saucerShot.ttl != 0xFF) {
-    tv.set_pixel(saucerShot.x, saucerShot.y, 0);
+    arduboy.drawPixel(saucerShot.x, saucerShot.y, BLACK);
+    // display.drawPixel(saucerShot.x, saucerShot.y, 0);
     if (saucerShot.ttl == 0) {
       saucerShot.ttl = 0xFF;
       return;
     }
     saucerShot.ttl--;
     moveShot(&saucerShot);
-    tv.set_pixel(saucerShot.x, saucerShot.y, 1);
+    arduboy.drawPixel(saucerShot.x, saucerShot.y, WHITE);
+    // display.drawPixel(saucerShot.x, saucerShot.y, 1);
   }
 }
 
@@ -449,7 +482,8 @@ void loop() {
   }
   d *= speedAdjust;
   if (d > 0) {
-    tv.delay(d);
+    delay(d);
+    // tv.delay(d);
   }
 
   /*
@@ -483,9 +517,11 @@ void loop() {
       if (clock % 2 == 0) {
         drawExplosions();
         drawSaucer();
+        arduboy.display();
       }
       if (d > 0) {
-        tv.delay(d + 5);
+        delay(d + 5);
+        // tv.delay(d + 5);
       }
       moveAsteroids();
     }
@@ -520,7 +556,8 @@ void loop() {
       clock++;
       moveAsteroids();
       if (d > 0) {
-        tv.delay(d);
+        delay(d);
+        // tv.delay(d);
       }
     }
     nextHeartbeat = clock + 1;
@@ -536,12 +573,14 @@ void loop() {
   if (nAsteroids == 0) {
     for (byte k = 0; k < MAX_SHOTS; k++) {
       if (shots[k].ttl != 0xFF) {
-        tv.set_pixel(shots[k].x, shots[k].y, 0);
+        arduboy.drawPixel(shots[k].x, shots[k].y, BLACK);
+        // display.drawPixel(shots[k].x, shots[k].y, 0);
         shots[k].ttl = 0xFF;
       }
     }
     if (saucerShot.ttl != 0xFF) {
-      tv.set_pixel(saucerShot.x, saucerShot.y, 0);
+      arduboy.drawPixel(saucerShot.x, saucerShot.y, BLACK);
+      // display.drawPixel(saucerShot.x, saucerShot.y, 0);
       saucerShot.ttl = 0xFF;
     }
 
@@ -551,7 +590,8 @@ void loop() {
       drawShip();
       drawSaucer();
       if (d > 0) {
-        tv.delay(d + 10);
+        delay(d + 10);
+        // tv.delay(d + 10);
       }
     }
     newLevel();
@@ -564,6 +604,7 @@ void loop() {
     }
     initGame(displayHighScores(1));
   }
+  arduboy.display();
 }
 
 void incrementScore(int n) {
@@ -579,7 +620,9 @@ void incrementScore(int n) {
 void displayScore() {
   byte i;
   sprintf(s, "%u", score);
-  tv.print(0, 0, s);
+  arduboy.setCursor(0,0);
+  arduboy.print(s);
+  // tv.print(0, 0, s);
   for (i = 0; i < remainingShips; i++) {
     overlaybitmap(i * 6, 6, ship_bitmaps, 0, 0, 0);
   }
@@ -790,7 +833,8 @@ void drawShip() {
   // If the ship has moved in some way
   if ((oldShipHeading != shipHeading) || (oldShipX != (byte)(shipX + 0.5)) || (oldShipY != (byte)(shipY + 0.5))) {
     erasebitmap(oldShipX, oldShipY, ship_bitmaps + (oldShipHeading * SIZEOF_SHIP_BITMAP_RECORD), 0, 0, 0);
-    tv.set_pixel(oldShipX + thrustX, oldShipY + thrustY, 0);
+    arduboy.drawPixel(oldShipX + thrustX, oldShipY + thrustY, BLACK);
+    // display.drawPixel(oldShipX + thrustX, oldShipY + thrustY, 0);
     oldShipHeading = shipHeading;
     oldShipX = (byte)(shipX + 0.5);
     oldShipY = (byte)(shipY + 0.5);
@@ -814,8 +858,9 @@ void drawShip() {
     }
 
     overlaybitmap(oldShipX, oldShipY, ship_bitmaps + (oldShipHeading * SIZEOF_SHIP_BITMAP_RECORD), 0, 0, 0);
-    if (Controller.upPressed()) {
-      tv.set_pixel(oldShipX + thrustX, oldShipY + thrustY, clock % 2);
+    if (upPressed()) {
+      arduboy.drawPixel(oldShipX + thrustX, oldShipY + thrustY, clock % 2);
+      // display.drawPixel(oldShipX + thrustX, oldShipY + thrustY, clock % 2);
     }
   }
 }
@@ -875,12 +920,14 @@ boolean detectCollisions() {
         die();
         for (byte k = 0; k < MAX_SHOTS; k++) {
           if (shots[k].ttl != 0xFF) {
-            tv.set_pixel(shots[k].x, shots[k].y, 0);
+            arduboy.drawPixel(shots[k].x, shots[k].y, BLACK);
+            // display.drawPixel(shots[k].x, shots[k].y, 0);
             shots[k].ttl = 0xFF;
           }
         }
         if (saucerShot.ttl != 0xFF) {
-          tv.set_pixel(saucerShot.x, saucerShot.y, 0);
+          arduboy.drawPixel(saucerShot.x, saucerShot.y, BLACK);
+          // display.drawPixel(saucerShot.x, saucerShot.y, 0);
           saucerShot.ttl = 0xFF;
         }
         displayScore();
@@ -903,7 +950,8 @@ boolean detectCollisions() {
         asteroids[i].info = 0x80;  // make the asteroid structure unused
         nAsteroids--;
         // erase the shot and disable it
-        tv.set_pixel(shots[j].x, shots[j].y, 0);
+        arduboy.drawPixel(shots[j].x, shots[j].y, BLACK);
+        // display.drawPixel(shots[j].x, shots[j].y, 0);
         shots[j].ttl = 0xFF;
 
         if (explosions[explosionIndex].index != 255) {
@@ -1018,12 +1066,14 @@ boolean detectCollisions() {
         saucerY = 255;
         for (byte k = 0; k < MAX_SHOTS; k++) {
           if (shots[k].ttl != 0xFF) {
-            tv.set_pixel(shots[k].x, shots[k].y, 0);
+            arduboy.drawPixel(shots[k].x, shots[k].y, BLACK);
+            // display.drawPixel(shots[k].x, shots[k].y, 0);
             shots[k].ttl = 0xFF;
           }
         }
         if (saucerShot.ttl != 0xFF) {
-          tv.set_pixel(saucerShot.x, saucerShot.y, 0);
+          arduboy.drawPixel(saucerShot.x, saucerShot.y, BLACK);
+          // display.drawPixel(saucerShot.x, saucerShot.y, 0);
           saucerShot.ttl = 0xFF;
         }
         displayScore();
@@ -1043,7 +1093,8 @@ boolean detectCollisions() {
         scored = true;
         incrementScore(500);
         erasebitmap(saucerX, saucerY, saucer_bitmaps, 0, 0, 0);
-        tv.set_pixel(shots[j].x, shots[j].y, 0);
+        arduboy.drawPixel(shots[j].x, shots[j].y, BLACK);
+        // display.drawPixel(shots[j].x, shots[j].y, 0);
         shots[j].ttl = 0xFF;
         if (explosions[explosionIndex].index != 255) {
           erasebitmap(explosions[explosionIndex].x, explosions[explosionIndex].y, explosion_bitmaps + ((explosions[explosionIndex].index - 1) * SIZEOF_EXPLOSION_BITMAP_RECORD), 0, 0, 0);
@@ -1068,12 +1119,14 @@ boolean detectCollisions() {
       die();
       for (byte k = 0; k < MAX_SHOTS; k++) {
         if (shots[k].ttl != 0xFF) {
-          tv.set_pixel(shots[k].x, shots[k].y, 0);
+          arduboy.drawPixel(shots[k].x, shots[k].y, BLACK);
+          // display.drawPixel(shots[k].x, shots[k].y, 0);
           shots[k].ttl = 0xFF;
         }
       }
       if (saucerShot.ttl != 0xFF) {
-        tv.set_pixel(saucerShot.x, saucerShot.y, 0);
+        arduboy.drawPixel(saucerShot.x, saucerShot.y, BLACK);
+        // display.drawPixel(saucerShot.x, saucerShot.y, 0);
         saucerShot.ttl = 0xFF;
       }
       displayScore();
@@ -1091,7 +1144,10 @@ void die() {
   erasebitmap(remainingShips * 6, 6, ship_bitmaps, 0, 0, 0);
 
   erasebitmap(oldShipX, oldShipY, ship_bitmaps + (oldShipHeading * SIZEOF_SHIP_BITMAP_RECORD), 0, 0, 0);
-  tv.set_pixel(oldShipX + thrustX, oldShipY + thrustY, 0);
+
+  arduboy.drawPixel(oldShipX + thrustX, oldShipY + thrustY, BLACK);
+  // display.drawPixel(oldShipX + thrustX, oldShipY + thrustY, 0);
+
   shipExplosion.x = oldShipX - 4;
   if (shipExplosion.x > 250) {
     shipExplosion.x = W - 1;
@@ -1104,7 +1160,8 @@ void die() {
 }
 
 boolean titleScreen() {
-  tv.fill(0);
+  arduboy.fillScreen(BLACK);
+  // tv.fill(0);
 
   overlaybitmap(0, 10, asteroid_bitmaps + (0 * SIZEOF_ASTEROID_BITMAP_RECORD), 0, 0, 0);
   overlaybitmap(35, 0, asteroid_bitmaps + (1 * SIZEOF_ASTEROID_BITMAP_RECORD), 0, 0, 0);
@@ -1114,16 +1171,23 @@ boolean titleScreen() {
   overlaybitmap(50, 70, asteroid_bitmaps + (6 * SIZEOF_ASTEROID_BITMAP_RECORD), 0, 0, 0);
   overlaybitmap(110, 50, asteroid_bitmaps + (7 * SIZEOF_ASTEROID_BITMAP_RECORD), 0, 0, 0);
   overlaybitmap(52, 24, ship_bitmaps + (2 * SIZEOF_SHIP_BITMAP_RECORD), 0, 0, 0);
-  tv.set_pixel(63, 19, 1);
+  arduboy.drawPixel(63, 19, WHITE);
+  // display.drawPixel(63, 19, 1);
   overlaybitmap(70, 0, explosion_bitmaps + (0 * SIZEOF_EXPLOSION_BITMAP_RECORD), 0, 0, 0);
   overlaybitmap(70, 0, explosion_bitmaps + (3 * SIZEOF_EXPLOSION_BITMAP_RECORD), 0, 0, 0);
 
   overlaybitmap(0, 20, title_bitmap, 0, 0, 0);
 
+  arduboy.display();
+
   if (pollFireButton(100)) {
     return true;
   }
+  
   overlaybitmap(70, 66, hackvision_logo_bitmap, 0, 0, 0);
+
+  arduboy.display();
+
   if (pollFireButton(400)) {
     return true;
   }
@@ -1132,49 +1196,80 @@ boolean titleScreen() {
 
 
 void newLevel() {
-  tv.delay(500);
-  tv.fill(0);
+  delay(500);
+  //tv.delay(500);
+
+  arduboy.fillScreen(BLACK);
+  // tv.fill(0);
   level++;
   initVars();
   drawShip();
 }
 
 void gameOver() {
-  tv.delay(500);
-  tv.fill(0);
+  delay(500);
+  //tv.delay(500);
+
+  arduboy.fillScreen(BLACK);
+  //tv.fill(0);
   //tv.select_font(font6x8);
-  strcpy_P(s, (char *)pgm_read_word(&(strings[2])));
-  tv.print(40, 40, s);
-  strcpy_P(s, (char *)pgm_read_word(&(strings[3])));
-  tv.print(72, 40, s);
-  tv.delay(2000);
+  // strcpy_P(s, (char *)pgm_read_word(&(strings[2])));
+
+  arduboy.setCursor(40, 40);
+  arduboy.print("GAME");
+  // tv.print(40, 40, s);
+  //  strcpy_P(s, (char *)pgm_read_word(&(strings[3])));
+
+  arduboy.setCursor(72,40);
+  arduboy.print("OVER");
+  // tv.print(72, 40, s);
+
+  sprintf(s, "%u", score);
+  arduboy.setCursor(40,20);
+  arduboy.print(s);
+
+  arduboy.display();
+
+  pollFireButton(100000);
+  //tv.delay(2000);
 }
 
 void enterInitials() {
   char index = 0;
 
-  tv.fill(0);
-  strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
-  s[10] = '\0'; // hack: truncate the final 'S' off of the string "HIGH SCORES"
-  tv.print(16, 0, s);
+  arduboy.fillScreen(BLACK);
+  // tv.fill(0);
+
+  // strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
+  // s[10] = '\0'; // hack: truncate the final 'S' off of the string "HIGH SCORES"
+
+  arduboy.setCursor(16, 0);
+  arduboy.print("HIGH SCORE");
+  // tv.print(16, 0, s);
   sprintf(s, "%u", score);
-  tv.print(88, 0, s);
+  arduboy.setCursor(88, 0);
+  arduboy.print(s);
+  // tv.print(88, 0, s);
 
   initials[0] = ' ';
   initials[1] = ' ';
   initials[2] = ' ';
 
   while (true) {
-    tv.print_char(56, 20, initials[0]);
-    tv.print_char(64, 20, initials[1]);
-    tv.print_char(72, 20, initials[2]);
+    //TODO: tv.print_char(56, 20, initials[0]);
+    //TODO: tv.print_char(64, 20, initials[1]);
+    //TODO: tv.print_char(72, 20, initials[2]);
     for (byte i = 0; i < 3; i++) {
-      tv.draw_line(56 + (i * 8), 27, 56 + (i * 8) + 6, 27, 1);
+      arduboy.drawLine(56 + (i * 8), 27, 56 + (i * 8) + 6, 27, 1);
+      //tv.draw_line(56 + (i * 8), 27, 56 + (i * 8) + 6, 27, 1);
     }
-    tv.draw_line(56, 28, 88, 28, 0);
-    tv.draw_line(56 + (index * 8), 28, 56 + (index * 8) + 6, 28, 1);
-    tv.delay(150);
-    if (Controller.leftPressed()) {
+    arduboy.drawLine(56, 28, 88, 28, 0);
+    // tv.draw_line(56, 28, 88, 28, 0);
+    arduboy.drawLine(56 + (index * 8), 28, 56 + (index * 8) + 6, 28, 1);
+    // tv.draw_line(56 + (index * 8), 28, 56 + (index * 8) + 6, 28, 1);
+    delay(150);
+    // tv.delay(150);
+    if (leftPressed()) {
       index--;
       if (index < 0) {
         index = 0;
@@ -1182,7 +1277,7 @@ void enterInitials() {
         playTone(1046, 20);
       }
     }
-    if (Controller.rightPressed()) {
+    if (rightPressed()) {
       index++;
       if (index > 2) {
         index = 2;
@@ -1190,7 +1285,7 @@ void enterInitials() {
         playTone(1046, 20);
       }
     }
-    if (Controller.upPressed()) {
+    if (upPressed()) {
       initials[index]++;
       playTone(523, 20);
       // A-Z 0-9 :-? !-/ ' '
@@ -1207,7 +1302,7 @@ void enterInitials() {
         initials[index] = '!';
       }
     }
-    if (Controller.downPressed()) {
+    if (downPressed()) {
       initials[index]--;
       playTone(523, 20);
       if (initials[index] == ' ') {
@@ -1223,7 +1318,7 @@ void enterInitials() {
         initials[index] = ' ';
       }
     }
-    if (Controller.firePressed()) {
+    if (firePressed()) {
       if (index < 2) {
         index++;
         playTone(1046, 20);
@@ -1237,6 +1332,10 @@ void enterInitials() {
 }
 
 void enterHighScore(byte file) {
+
+  //TODO: EEPROM not supported
+  return;
+  
   // Each block of EEPROM has 10 high scores, and each high score entry
   // is 5 bytes long:  3 bytes for initials and two bytes for score.
   int address = file * 10 * 5;
@@ -1246,8 +1345,8 @@ void enterHighScore(byte file) {
 
   // High score processing
   for (byte i = 0; i < 10; i++) {
-    hi = EEPROM.read(address + (5 * i));
-    lo = EEPROM.read(address + (5 * i) + 1);
+    //TODO: hi = EEPROM.read(address + (5 * i));
+    //TODO: lo = EEPROM.read(address + (5 * i) + 1);
     if ((hi == 0xFF) && (lo == 0xFF)) {
       // The values are uninitialized, so treat this entry
       // as a score of 0.
@@ -1258,25 +1357,25 @@ void enterHighScore(byte file) {
     if (score > tmpScore) {
       enterInitials();
       for (byte j = i; j < 10; j++) {
-        hi = EEPROM.read(address + (5 * j));
-        lo = EEPROM.read(address + (5 * j) + 1);
+        //TODO: hi = EEPROM.read(address + (5 * j));
+        //TODO: lo = EEPROM.read(address + (5 * j) + 1);
         if ((hi == 0xFF) && (lo == 0xFF)) {
           tmpScore = 0;
         } else {
           tmpScore = (hi << 8) | lo;
         }
-        tmpInitials[0] = (char)EEPROM.read(address + (5 * j) + 2);
-        tmpInitials[1] = (char)EEPROM.read(address + (5 * j) + 3);
-        tmpInitials[2] = (char)EEPROM.read(address + (5 * j) + 4);
+        //TODO: tmpInitials[0] = (char)EEPROM.read(address + (5 * j) + 2);
+        //TODO: tmpInitials[1] = (char)EEPROM.read(address + (5 * j) + 3);
+        //TODO: tmpInitials[2] = (char)EEPROM.read(address + (5 * j) + 4);
 
         // tmpScore and tmpInitials now hold what we want to write in the next slot.
 
         // write score and initials to current slot
-        EEPROM.write(address + (5 * j), ((score >> 8) & 0xFF));
-        EEPROM.write(address + (5 * j) + 1, (score & 0xFF));
-        EEPROM.write(address + (5 * j) + 2, initials[0]);
-        EEPROM.write(address + (5 * j) + 3, initials[1]);
-        EEPROM.write(address + (5 * j) + 4, initials[2]);
+        //TODO: EEPROM.write(address + (5 * j), ((score >> 8) & 0xFF));
+        //TODO: EEPROM.write(address + (5 * j) + 1, (score & 0xFF));
+        //TODO: EEPROM.write(address + (5 * j) + 2, initials[0]);
+        //TODO: EEPROM.write(address + (5 * j) + 3, initials[1]);
+        //TODO: EEPROM.write(address + (5 * j) + 4, initials[2]);
 
         score = tmpScore;
         initials[0] = tmpInitials[0];
@@ -1294,36 +1393,52 @@ void enterHighScore(byte file) {
 
 
 boolean displayHighScores(byte file) {
+  
+  //TODO: EEPROM not supported
+  return false;
+
   byte y = 10;
   byte x = 24;
   // Each block of EEPROM has 10 high scores, and each high score entry
   // is 5 bytes long:  3 bytes for initials and two bytes for score.
   int address = file * 10 * 5;
   byte hi, lo;
-  tv.fill(0);
+  arduboy.fillScreen(BLACK);
+  //tv.fill(0);
   //tv.select_font(font6x8);
-  strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
-  tv.print(32, 0, s);
+  //strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
+
+  arduboy.setCursor(32,0);
+  arduboy.print("HIGH SCORES");
+  // tv.print(32, 0, s);
+
   for (int i = 0; i < 10; i++) {
     sprintf(s, "%2d", i + 1);
-    tv.print(x, y + (i * 8), s);
 
-    hi = EEPROM.read(address + (5 * i));
-    lo = EEPROM.read(address + (5 * i) + 1);
+    arduboy.setCursor(x, y + (i * 8));
+    arduboy.print(s);
+    //tv.print(x, y + (i * 8), s);
+
+    //hi = EEPROM.read(address + (5 * i));
+    //lo = EEPROM.read(address + (5 * i) + 1);
     if ((hi == 0xFF) && (lo == 0xFF)) {
       score = 0;
     } else {
       score = (hi << 8) | lo;
     }
-    initials[0] = (char)EEPROM.read(address + (5 * i) + 2);
-    initials[1] = (char)EEPROM.read(address + (5 * i) + 3);
-    initials[2] = (char)EEPROM.read(address + (5 * i) + 4);
+    //initials[0] = (char)EEPROM.read(address + (5 * i) + 2);
+    //initials[1] = (char)EEPROM.read(address + (5 * i) + 3);
+    //initials[2] = (char)EEPROM.read(address + (5 * i) + 4);
 
     if (score > 0) {
       sprintf(s, "%c%c%c %u", initials[0], initials[1], initials[2], score);
-      tv.print(x + 24, y + (i * 8), s);
+      arduboy.setCursor(x + 24, y + (i * 8));
+      arduboy.print(s);
+      // tv.print(x + 24, y + (i * 8), s);
     }
   }
+
+  arduboy.display();
 
   if (pollFireButton(300)) {
     return true;
@@ -1332,11 +1447,11 @@ boolean displayHighScores(byte file) {
 }
 
 
-
 boolean pollFireButton(int n) {
   for (int i = 0; i < n; i++) {
-    tv.delay(15);
-    if (Controller.firePressed()) {
+    //tv.delay(15);
+    delay(15);
+    if (firePressed()) {
       return true;
     }
   }
@@ -1344,7 +1459,8 @@ boolean pollFireButton(int n) {
 }
 
 void initGame(boolean start) {
-  tv.fill(0);
+  arduboy.fillScreen(BLACK);
+  // tv.fill(0);
 
   while (!start) {
     start = titleScreen();
@@ -1352,8 +1468,12 @@ void initGame(boolean start) {
       start = displayHighScores(1);
     }
   }
-  tv.fill(0);
-  tv.delay(100);
+ 
+  arduboy.fillScreen(BLACK);
+  // tv.fill(0);
+
+  delay(100);
+  // tv.delay(100);
 
   level = 1;
   remainingShips = 3;
@@ -1366,16 +1486,28 @@ void initGame(boolean start) {
 
 void debug(int m) {
   sprintf(s, "       ");
-  tv.print(64, FOOTER_Y, s);
+  arduboy.setCursor(64, FOOTER_Y);
+  arduboy.print(s);
+  // tv.print(64, FOOTER_Y, s);
+
   sprintf(s, "%d", m);
-  tv.print(64, FOOTER_Y, s);
+  arduboy.setCursor(64, FOOTER_Y);
+  arduboy.print(s);
+  // tv.print(64, FOOTER_Y, s);
 }
 
 void debug(char *ss) {
   for (byte y = FOOTER_Y; y < H; y++) {
-    tv.draw_line(48, y, 90, y, 0);
+    arduboy.drawLine(48, y, 90, y, 0);
+    // tv.draw_line(48, y, 90, y, 0);
   }
-  tv.print(64, FOOTER_Y, ss);
+  arduboy.setTextSize(1);
+  arduboy.setTextColor(WHITE);
+  arduboy.setTextColor(BLACK);
+  arduboy.setCursor(64, FOOTER_Y);
+  arduboy.print(ss);
+
+  // tv.print(64, FOOTER_Y, ss);
 }
 
 
@@ -1392,7 +1524,7 @@ int getMemory() {
 boolean getInput() {
   boolean input = false;
 
-  if (Controller.firePressed()) {
+  if (firePressed()) {
     if (!fired) {
       fired = true;
       input = true;
@@ -1425,14 +1557,14 @@ boolean getInput() {
     fired = false;
   }
 
-  if (Controller.leftPressed()) {
+  if (leftPressed()) {
     shipHeading--;
     if (shipHeading == 255) {
       shipHeading = 15;
     }
     input = true;
   } else {
-    if (Controller.rightPressed()) {
+    if (rightPressed()) {
       shipHeading++;
       if (shipHeading > 15) {
         shipHeading = 0;
@@ -1442,8 +1574,9 @@ boolean getInput() {
   }
 
 
-  if (Controller.upPressed()) {
-    tv.set_pixel(oldShipX + thrustX, oldShipY + thrustY, 0);
+  if (upPressed()) {
+    arduboy.drawPixel(oldShipX + thrustX, oldShipY + thrustY, BLACK);
+    // display.drawPixel(oldShipX + thrustX, oldShipY + thrustY, 0);
     switch (shipHeading) {
       case 0: // straight up
         shipDY -= THRUST;
@@ -1542,7 +1675,7 @@ boolean getInput() {
     shipDY = min(shipDY, 10.0);
     input = true;
   } else {
-    if ((Controller.downPressed()) && (hyperspaceCount == -1)) {
+    if ((downPressed()) && (hyperspaceCount == -1)) {
       // Hyperspace!
       // or as my son Paul calls it, "Galaxy Warp"
       erasebitmap(oldShipX, oldShipY, ship_bitmaps + (oldShipHeading * SIZEOF_SHIP_BITMAP_RECORD), 0, 0, 0);
@@ -1561,14 +1694,14 @@ void playTone(unsigned int frequency, unsigned long duration_ms) {
 
 void playTone(unsigned int frequency, unsigned long duration_ms, byte priority) {
   // priority is value 0-9, 9 being highest priority
-  if (TCCR2B > 0) {
-    // If a tone is currently playing, check priority
-    if (priority < currentTonePriority) {
-      return;
-    }
-  }
+//  if (TCCR2B > 0) {
+//    // If a tone is currently playing, check priority
+//    if (priority < currentTonePriority) {
+//      return;
+//    }
+//  }
   currentTonePriority = priority;
-  tv.tone(frequency, duration_ms);
+  //  tv.tone(frequency, duration_ms);
 }
 
 
@@ -1589,44 +1722,65 @@ void overlaybitmap(uint8_t x, uint8_t y, const unsigned char * bmp,
     i++;
   }
 
-  if (width & 7) {
-    xtra = width & 7;
-    width = width / 8;
-    width++;
-  }
-  else {
-    xtra = 8;
-    width = width / 8;
+//  if (width & 7) {
+//    xtra = width & 7;
+//    width = width / 8;
+//    width++;
+//  }
+//  else {
+//    xtra = 8;
+//    width = width / 8;
+//  }
+
+  uint8_t screen_h = HEIGHT;
+  uint8_t screen_w = WIDTH;
+  uint8_t byte_cnt;
+  uint8_t bitmap = 0;
+
+  for (uint8_t b = 0 ; b < lines; b++) {
+    byte_cnt = 9;
+    for (uint8_t a = 0; a < width; a++) {
+      if (byte_cnt == 9) {
+        bitmap = pgm_read_byte((uint32_t)(bmp) + i);
+        i++;
+        byte_cnt = 1;
+      }
+      if ((bitmap & (1 << (8 - byte_cnt))) != 0) {
+        arduboy.drawPixel((x + a) % screen_w, (y + b) % screen_h, WHITE);
+      }
+      byte_cnt++;
+    }
   }
 
-  for (uint8_t l = 0; l < lines; l++) {
-    si = ((y + l) % display.vres) * display.hres + x / 8;
-    //si = (y + l)*display.hres + x/8;
-    if (width == 1)
-      temp = 0xff >> rshift + xtra;
-    else
-      temp = 0;
-    save = display.screen[si];
-    temp = pgm_read_byte((uint32_t)(bmp) + i++);
-    display.screen[si++] |= temp >> rshift;
-    for ( uint16_t b = i + width - 1; i < b; i++) {
-      if (si % display.hres == 0) {
-        // wrapped around to the left side
-        si -= display.hres;
-      }
-      save = display.screen[si];
-      display.screen[si] |= temp << lshift;
-      temp = pgm_read_byte((uint32_t)(bmp) + i);
-      display.screen[si++] |= temp >> rshift;
-    }
-    if (si % display.hres == 0) {
-      // wrapped around to the left side
-      si -= display.hres;
-    }
-    if (rshift + xtra < 8)
-      display.screen[si - 1] |= (save & (0xff >> rshift + xtra));	//test me!!!
-    display.screen[si] |= temp << lshift;
-  }
+//  for (uint8_t l = 0; l < lines; l++) {
+//    si = ((y + l) % display.height()) * display.width() + x / 8;
+//    //si = (y + l)*display.width() + x/8;
+//
+//    if (width == 1)
+//      temp = 0xff >> rshift + xtra;
+//    else
+//      temp = 0;
+//    save = display.screen[si];
+//    temp = pgm_read_byte((uint32_t)(bmp) + i++);
+//    display.screen[si++] |= temp >> rshift;
+//    for ( uint16_t b = i + width - 1; i < b; i++) {
+//      if (si % display.hres == 0) {
+//        // wrapped around to the left side
+//        si -= display.hres;
+//      }
+//      save = display.screen[si];
+//      display.screen[si] |= temp << lshift;
+//      temp = pgm_read_byte((uint32_t)(bmp) + i);
+//      display.screen[si++] |= temp >> rshift;
+//    }
+//    if (si % display.hres == 0) {
+//      // wrapped around to the left side
+//      si -= display.hres;
+//    }
+//    if (rshift + xtra < 8)
+//      display.screen[si - 1] |= (save & (0xff >> rshift + xtra));	//test me!!!
+//    display.screen[si] |= temp << lshift;
+//  }
 } // end of bitmap
 
 void erasebitmap(uint8_t x, uint8_t y, const unsigned char * bmp,
@@ -1646,90 +1800,110 @@ void erasebitmap(uint8_t x, uint8_t y, const unsigned char * bmp,
     i++;
   }
 
-  if (width & 7) {
-    xtra = width & 7;
-    width = width / 8;
-    width++;
-  }
-  else {
-    xtra = 8;
-    width = width / 8;
-  }
+//  if (width & 7) {
+//    xtra = width & 7;
+//    width = width / 8;
+//    width++;
+//  }
+//  else {
+//    xtra = 8;
+//    width = width / 8;
+//  }
 
-  for (uint8_t l = 0; l < lines; l++) {
-    si = ((y + l) % display.vres) * display.hres + x / 8;
-    //si = (y + l)*display.hres + x/8;
-    if (width == 1)
-      temp = 0xff >> rshift + xtra;
-    else
-      temp = 0;
-    save = display.screen[si];
-    temp = pgm_read_byte((uint32_t)(bmp) + i++);
-    display.screen[si++] &= ~(temp >> rshift);
-    for ( uint16_t b = i + width - 1; i < b; i++) {
-      if (si % display.hres == 0) {
-        // wrapped around to the left side
-        si -= display.hres;
+  uint8_t screen_h = HEIGHT;
+  uint8_t screen_w = WIDTH;
+  uint8_t byte_cnt;
+  uint8_t bitmap = 0;
+
+  for (uint8_t b = 0 ; b < lines; b++) {
+    byte_cnt = 9;
+    for (uint8_t a = 0; a < width; a++) {
+      if (byte_cnt == 9) {
+        bitmap = pgm_read_byte((uint32_t)(bmp) + i);
+        i++;
+        byte_cnt = 1;
       }
-      save = display.screen[si];
-      display.screen[si] &= ~(temp << lshift);
-      temp = pgm_read_byte((uint32_t)(bmp) + i);
-      display.screen[si++] &= ~(temp >> rshift);
+      if ((bitmap & (1 << (8 - byte_cnt))) != 0) {
+        arduboy.drawPixel((x + a) % screen_w, (y + b) % screen_h, BLACK);
+      }
+      byte_cnt++;
     }
-    if (si % display.hres == 0) {
-      // wrapped around to the left side
-      si -= display.hres;
-    }
-
-    if (rshift + xtra < 8)
-      display.screen[si - 1] &= ~(save & (0xff >> rshift + xtra));	//test me!!!
-    if (rshift + xtra - 8 > 0)
-      display.screen[si] &= ~(temp << lshift);
   }
+
+//  for (uint8_t l = 0; l < lines; l++) {
+//    si = ((y + l) % display.height()) * display.width() + x / 8;
+//    //si = (y + l)*display.width() + x/8;
+//    if (width == 1)
+//      temp = 0xff >> rshift + xtra;
+//    else
+//      temp = 0;
+//    save = display.screen[si];
+//    temp = pgm_read_byte((uint32_t)(bmp) + i++);
+//    display.screen[si++] &= ~(temp >> rshift);
+//    for ( uint16_t b = i + width - 1; i < b; i++) {
+//      if (si % display.hres == 0) {
+//        // wrapped around to the left side
+//        si -= display.hres;
+//      }
+//      save = display.screen[si];
+//      display.screen[si] &= ~(temp << lshift);
+//      temp = pgm_read_byte((uint32_t)(bmp) + i);
+//      display.screen[si++] &= ~(temp >> rshift);
+//    }
+//    if (si % display.hres == 0) {
+//      // wrapped around to the left side
+//      si -= display.hres;
+//    }
+//
+//    if (rshift + xtra < 8)
+//      display.screen[si - 1] &= ~(save & (0xff >> rshift + xtra));	//test me!!!
+//    if (rshift + xtra - 8 > 0)
+//      display.screen[si] &= ~(temp << lshift);
+//  }
 } // end of bitmap
 
 
-void soundISR() {
-  if (TCCR2B != 0) {
-    if (sound == FIRE) {
-      freq = freq - 100;
-      setPWMFreq(freq);
-    } else {
-      if (sound == EXPLOSION) {
-        explosionFreqIndex++;
-        if (explosionFreqIndex >= 100) {
-          explosionFreqIndex = 0;
-        }
-        freq = pgm_read_byte(explosionFreq + explosionFreqIndex);
-        OCR2A = (LOW_FREQ_OCR / freq) - 1;
-        TCCR2B = 0b111;
-      }
-    }
-  } else {
-    sound = 0;
-  }
-}
+//void soundISR() {
+//  if (TCCR2B != 0) {
+//    if (sound == FIRE) {
+//      freq = freq - 100;
+//      setPWMFreq(freq);
+//    } else {
+//      if (sound == EXPLOSION) {
+//        explosionFreqIndex++;
+//        if (explosionFreqIndex >= 100) {
+//          explosionFreqIndex = 0;
+//        }
+//        freq = pgm_read_byte(explosionFreq + explosionFreqIndex);
+//        OCR2A = (LOW_FREQ_OCR / freq) - 1;
+//        TCCR2B = 0b111;
+//      }
+//    }
+//  } else {
+//    sound = 0;
+//  }
+//}
 
-void setPWMFreq(unsigned int f) {
-  uint32_t ocr;
-  uint8_t prescalarbits;
-
-  ocr = F_CPU / f / 2 / 64 - 1;
-  prescalarbits = 0b100;
-  if (ocr > 255) {
-    ocr = F_CPU / f / 2 / 128 - 1;
-    prescalarbits = 0b101;
-
-    if (ocr > 255) {
-      ocr = F_CPU / f / 2 / 256 - 1;
-      prescalarbits = 0b110;
-
-      if (ocr > 255) {
-        ocr = F_CPU / f / 2 / 1024 - 1;
-        prescalarbits = 0b111;
-      }
-    }
-  }
-  TCCR2B = prescalarbits;
-  OCR2A = ocr;
-}
+//void setPWMFreq(unsigned int f) {
+//  uint32_t ocr;
+//  uint8_t prescalarbits;
+//
+//  ocr = F_CPU / f / 2 / 64 - 1;
+//  prescalarbits = 0b100;
+//  if (ocr > 255) {
+//    ocr = F_CPU / f / 2 / 128 - 1;
+//    prescalarbits = 0b101;
+//
+//    if (ocr > 255) {
+//      ocr = F_CPU / f / 2 / 256 - 1;
+//      prescalarbits = 0b110;
+//
+//      if (ocr > 255) {
+//        ocr = F_CPU / f / 2 / 1024 - 1;
+//        prescalarbits = 0b111;
+//      }
+//    }
+//  }
+//  TCCR2B = prescalarbits;
+//  OCR2A = ocr;
+//}

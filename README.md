@@ -1,7 +1,5 @@
 # Arduino Asteroids
 
-Asteroids for Hackvision, the tiny, hackable, Arduino-based video game system.
+Asteroids for Hackvision ported to the
+[Micro:Gamer](https://hackaday.io/project/47760-microgamer)
 
-For all installation instructions, see the [Hackvision games site](http://nootropicdesign.com/hackvision/games.html)
-
-Video: https://www.youtube.com/watch?v=w03dO0Hd660
