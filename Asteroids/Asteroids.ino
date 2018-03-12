@@ -27,11 +27,15 @@
 #include "explosion_frequencies.h"
 #include "asteroids_font.h"
 #include <Arduboy2.h>
+#include <MicroGamerMemoryCard.h>
 
 #define W (WIDTH)
 #define H (HEIGHT)
 
+#define NBR_HIGH_SCORES (7)
+
 Arduboy2 arduboy;
+MicroGamerMemoryCard mem(64/4);
 
 //#define DEBUG
 
@@ -620,6 +624,7 @@ void incrementScore(int n) {
 void displayScore() {
   byte i;
   sprintf(s, "%u", score);
+  arduboy.setTextColor(WHITE);
   arduboy.setCursor(0,0);
   arduboy.print(s);
   // tv.print(0, 0, s);
@@ -1215,6 +1220,7 @@ void gameOver() {
   //tv.select_font(font6x8);
   // strcpy_P(s, (char *)pgm_read_word(&(strings[2])));
 
+  arduboy.setTextColor(WHITE);
   arduboy.setCursor(40, 40);
   arduboy.print("GAME");
   // tv.print(40, 40, s);
@@ -1243,6 +1249,7 @@ void enterInitials() {
   // strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
   // s[10] = '\0'; // hack: truncate the final 'S' off of the string "HIGH SCORES"
 
+  arduboy.setTextColor(WHITE);
   arduboy.setCursor(16, 0);
   arduboy.print("HIGH SCORE");
   // tv.print(16, 0, s);
@@ -1255,10 +1262,18 @@ void enterInitials() {
   initials[1] = ' ';
   initials[2] = ' ';
 
+  delay(300);
+
   while (true) {
-    //TODO: tv.print_char(56, 20, initials[0]);
-    //TODO: tv.print_char(64, 20, initials[1]);
-    //TODO: tv.print_char(72, 20, initials[2]);
+    arduboy.setCursor(56, 20);
+    arduboy.print(initials[0]);
+    // tv.print_char(56, 20, initials[0]);
+    arduboy.setCursor(64, 20);
+    arduboy.print(initials[1]);
+    // tv.print_char(64, 20, initials[1]);
+    arduboy.setCursor(72, 20);
+    arduboy.print(initials[2]);
+    // tv.print_char(72, 20, initials[2]);
     for (byte i = 0; i < 3; i++) {
       arduboy.drawLine(56 + (i * 8), 27, 56 + (i * 8) + 6, 27, 1);
       //tv.draw_line(56 + (i * 8), 27, 56 + (i * 8) + 6, 27, 1);
@@ -1267,7 +1282,8 @@ void enterInitials() {
     // tv.draw_line(56, 28, 88, 28, 0);
     arduboy.drawLine(56 + (index * 8), 28, 56 + (index * 8) + 6, 28, 1);
     // tv.draw_line(56 + (index * 8), 28, 56 + (index * 8) + 6, 28, 1);
-    delay(150);
+    
+    delay(50);
     // tv.delay(150);
     if (leftPressed()) {
       index--;
@@ -1327,26 +1343,26 @@ void enterInitials() {
         return;
       }
     }
+    arduboy.display();
   }
 
 }
 
 void enterHighScore(byte file) {
 
-  //TODO: EEPROM not supported
-  return;
-  
   // Each block of EEPROM has 10 high scores, and each high score entry
   // is 5 bytes long:  3 bytes for initials and two bytes for score.
-  int address = file * 10 * 5;
-  byte hi, lo;
+  int address = 0;
+  uint8_t hi, lo;
   char tmpInitials[3];
   unsigned int tmpScore = 0;
 
+  mem.load();
+
   // High score processing
-  for (byte i = 0; i < 10; i++) {
-    //TODO: hi = EEPROM.read(address + (5 * i));
-    //TODO: lo = EEPROM.read(address + (5 * i) + 1);
+  for (byte i = 0; i < NBR_HIGH_SCORES; i++) {
+    hi = mem.read(address + (5 * i));
+    lo = mem.read(address + (5 * i) + 1);
     if ((hi == 0xFF) && (lo == 0xFF)) {
       // The values are uninitialized, so treat this entry
       // as a score of 0.
@@ -1357,26 +1373,25 @@ void enterHighScore(byte file) {
     if (score > tmpScore) {
       enterInitials();
       for (byte j = i; j < 10; j++) {
-        //TODO: hi = EEPROM.read(address + (5 * j));
-        //TODO: lo = EEPROM.read(address + (5 * j) + 1);
+        hi = mem.read(address + (5 * j));
+        lo = mem.read(address + (5 * j) + 1);
         if ((hi == 0xFF) && (lo == 0xFF)) {
           tmpScore = 0;
         } else {
           tmpScore = (hi << 8) | lo;
         }
-        //TODO: tmpInitials[0] = (char)EEPROM.read(address + (5 * j) + 2);
-        //TODO: tmpInitials[1] = (char)EEPROM.read(address + (5 * j) + 3);
-        //TODO: tmpInitials[2] = (char)EEPROM.read(address + (5 * j) + 4);
+        tmpInitials[0] = (char)mem.read(address + (5 * j) + 2);
+        tmpInitials[1] = (char)mem.read(address + (5 * j) + 3);
+        tmpInitials[2] = (char)mem.read(address + (5 * j) + 4);
 
         // tmpScore and tmpInitials now hold what we want to write in the next slot.
 
         // write score and initials to current slot
-        //TODO: EEPROM.write(address + (5 * j), ((score >> 8) & 0xFF));
-        //TODO: EEPROM.write(address + (5 * j) + 1, (score & 0xFF));
-        //TODO: EEPROM.write(address + (5 * j) + 2, initials[0]);
-        //TODO: EEPROM.write(address + (5 * j) + 3, initials[1]);
-        //TODO: EEPROM.write(address + (5 * j) + 4, initials[2]);
-
+        mem.write(address + (5 * j), ((score >> 8) & 0xFF));
+        mem.write(address + (5 * j) + 1, (score & 0xFF));
+        mem.write(address + (5 * j) + 2, initials[0]);
+        mem.write(address + (5 * j) + 3, initials[1]);
+        mem.write(address + (5 * j) + 4, initials[2]);
         score = tmpScore;
         initials[0] = tmpInitials[0];
         initials[1] = tmpInitials[1];
@@ -1386,6 +1401,7 @@ void enterHighScore(byte file) {
       initials[0] = ' ';
       initials[1] = ' ';
       initials[2] = ' ';
+      mem.save();
       return;
     }
   }
@@ -1394,41 +1410,40 @@ void enterHighScore(byte file) {
 
 boolean displayHighScores(byte file) {
   
-  //TODO: EEPROM not supported
-  return false;
-
-  byte y = 10;
+  byte y = 8;
   byte x = 24;
   // Each block of EEPROM has 10 high scores, and each high score entry
   // is 5 bytes long:  3 bytes for initials and two bytes for score.
-  int address = file * 10 * 5;
+  int address = 0;
   byte hi, lo;
   arduboy.fillScreen(BLACK);
   //tv.fill(0);
   //tv.select_font(font6x8);
   //strcpy_P(s, (char *)pgm_read_word(&(strings[1])));
-
+  arduboy.setTextColor(WHITE);
   arduboy.setCursor(32,0);
   arduboy.print("HIGH SCORES");
   // tv.print(32, 0, s);
 
-  for (int i = 0; i < 10; i++) {
+  mem.load();
+  
+  for (int i = 0; i < NBR_HIGH_SCORES; i++) {
     sprintf(s, "%2d", i + 1);
 
     arduboy.setCursor(x, y + (i * 8));
     arduboy.print(s);
     //tv.print(x, y + (i * 8), s);
 
-    //hi = EEPROM.read(address + (5 * i));
-    //lo = EEPROM.read(address + (5 * i) + 1);
+    hi = mem.read(address + (5 * i));
+    lo = mem.read(address + (5 * i) + 1);
     if ((hi == 0xFF) && (lo == 0xFF)) {
       score = 0;
     } else {
       score = (hi << 8) | lo;
     }
-    //initials[0] = (char)EEPROM.read(address + (5 * i) + 2);
-    //initials[1] = (char)EEPROM.read(address + (5 * i) + 3);
-    //initials[2] = (char)EEPROM.read(address + (5 * i) + 4);
+    initials[0] = (char)mem.read(address + (5 * i) + 2);
+    initials[1] = (char)mem.read(address + (5 * i) + 3);
+    initials[2] = (char)mem.read(address + (5 * i) + 4);
 
     if (score > 0) {
       sprintf(s, "%c%c%c %u", initials[0], initials[1], initials[2], score);
@@ -1439,6 +1454,8 @@ boolean displayHighScores(byte file) {
   }
 
   arduboy.display();
+
+  delay(300);
 
   if (pollFireButton(300)) {
     return true;
