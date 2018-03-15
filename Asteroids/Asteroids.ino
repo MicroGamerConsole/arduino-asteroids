@@ -27,6 +27,7 @@
 #include "explosion_frequencies.h"
 #include "asteroids_font.h"
 #include <Arduboy2.h>
+#include "ArduboyTones.h"
 #include <MicroGamerMemoryCard.h>
 
 #define W (WIDTH)
@@ -35,6 +36,7 @@
 #define NBR_HIGH_SCORES (7)
 
 Arduboy2 arduboy;
+ArduboyTones audio(arduboy.audio.enabled);
 MicroGamerMemoryCard mem(64/4);
 
 //#define DEBUG
@@ -446,7 +448,7 @@ void heartbeat() {
   } else {
     heartbeatFreq = 85;
   }
-  playTone(heartbeatFreq, 60, 5);
+  // This is kinda anoying: playTone(heartbeatFreq, 60, 5);
   //nextHeartbeat = clock + 20;
   nextHeartbeat = max(clock + 10, (clock + 10 + (10 - clock / 100)));
 }
@@ -948,8 +950,7 @@ boolean detectCollisions() {
       }
       if (inPolygon(nverts, xvert, yvert, shots[j].x - asteroids[i].x, shots[j].y - asteroids[i].y)) {
         // hit an asteroid!
-        playTone(random(50, 100), 300, 9);
-        sound = EXPLOSION;
+        playExplosion();
         scored = true;
         eraseAsteroid(asteroids[i]);
         asteroids[i].info = 0x80;  // make the asteroid structure unused
@@ -1093,8 +1094,7 @@ boolean detectCollisions() {
       }
       if (inPolygon(6, xvert, yvert, shots[j].x - saucerX, shots[j].y - saucerY)) {
         // hit the saucer
-        playTone(random(50, 100), 300, 9);
-        sound = EXPLOSION;
+        playExplosion();
         scored = true;
         incrementScore(500);
         erasebitmap(saucerX, saucerY, saucer_bitmaps, 0, 0, 0);
@@ -1143,8 +1143,7 @@ boolean detectCollisions() {
 }
 
 void die() {
-  playTone(random(50, 100), 300, 9);
-  sound = EXPLOSION;
+  playExplosion();
   remainingShips--;
   erasebitmap(remainingShips * 6, 6, ship_bitmaps, 0, 0, 0);
 
@@ -1165,6 +1164,7 @@ void die() {
 }
 
 boolean titleScreen() {
+  playTitleTune();
   arduboy.fillScreen(BLACK);
   // tv.fill(0);
 
@@ -1212,6 +1212,7 @@ void newLevel() {
 }
 
 void gameOver() {
+  playGameOver();
   delay(500);
   //tv.delay(500);
 
@@ -1546,8 +1547,8 @@ boolean getInput() {
       fired = true;
       input = true;
       freq = F2;
-      playTone(freq, 100, 9);
-      sound = FIRE;
+//      playTone(freq, 100, 9);
+      playFire();
 
       byte ttl;
       byte oldestShot = 0;
@@ -1711,16 +1712,118 @@ void playTone(unsigned int frequency, unsigned long duration_ms) {
 
 void playTone(unsigned int frequency, unsigned long duration_ms, byte priority) {
   // priority is value 0-9, 9 being highest priority
-//  if (TCCR2B > 0) {
-//    // If a tone is currently playing, check priority
-//    if (priority < currentTonePriority) {
-//      return;
-//    }
-//  }
+  if (audio.playing() > 0) {
+    // If a tone is currently playing, check priority
+    if (priority < currentTonePriority) {
+      return;
+    }
+  }
   currentTonePriority = priority;
+  audio.tone(frequency, duration_ms);
   //  tv.tone(frequency, duration_ms);
 }
 
+void playTones(const uint16_t *tones, byte priority)
+{
+  // priority is value 0-9, 9 being highest priority
+  if (audio.playing() > 0) {
+    // If a tone is currently playing, check priority
+    if (priority < currentTonePriority) {
+      return;
+    }
+  }
+  currentTonePriority = priority;
+  audio.tones(tones);
+}
+
+void playExplosion(void)
+{
+#define EXPLOSION_TONES_COUNT 8
+  // Explosion tones are replaced with random values for each explosion
+  static uint16_t explosionTones[EXPLOSION_TONES_COUNT + 1] = {0, 0, 0, 0,
+                                                               0, 0, 0, 0,
+                                                               TONES_END};
+
+  for (int t = 0; t < EXPLOSION_TONES_COUNT / 2; t++) {
+     explosionTones[t * 2] = random(25, 70);
+     explosionTones[t * 2 + 1] = random(50, 100);
+  }
+  playTones(explosionTones, 9);
+  sound = EXPLOSION;
+}
+
+const uint16_t fireTones[] = {400, 20,
+                              350, 20,
+                              300, 20,
+                              250, 20,
+                              150, 20,
+                              100, 20,
+                              TONES_END};
+
+void playFire(void)
+{
+  playTones(fireTones, 9);
+  sound = FIRE;  
+}
+
+const uint16_t gameOverTones[] = {NOTE_B2,   300,
+                                  NOTE_C3,   150,
+                                  NOTE_REST, 150,
+                                  NOTE_G2,   150,
+                                  NOTE_FS2,  150,
+                                  NOTE_F2,   150,
+                                  NOTE_REST, 300,
+                                  NOTE_G2,   150,
+                                  NOTE_REST, 150,
+                                  NOTE_F2,   150,
+                                  NOTE_G2,   150,
+                                  NOTE_F2,   150,
+                                  NOTE_REST, 150,
+                                  NOTE_E2,   600,
+                                 TONES_END};
+
+void playGameOver(void)
+{
+  playTones(gameOverTones, 9);  
+}
+
+
+const uint16_t titleTones[] = {NOTE_B4,   150,
+                               NOTE_REST, 150,
+                               NOTE_B4,   150, 
+                               NOTE_REST, 150,
+                               NOTE_C5,   150, 
+                               NOTE_REST, 150,
+                               NOTE_B4,   150, 
+                               NOTE_REST, 30,
+                               NOTE_E5,   150, 
+                               NOTE_REST, 150,
+                               NOTE_B4,   150, 
+                               NOTE_C5,   150, 
+                               NOTE_B4,   150, 
+                               NOTE_C5,   150, 
+
+
+                               NOTE_A4,   150,
+                               NOTE_REST, 150,
+                               NOTE_A4,   150, 
+                               NOTE_REST, 150,
+                               NOTE_B4,   150, 
+                               NOTE_REST, 150,
+                               NOTE_A4,   150, 
+                               NOTE_REST, 30,
+                               NOTE_D4,   150, 
+                               NOTE_REST, 150,
+                               NOTE_A4,   150, 
+                               NOTE_B4,   150, 
+                               NOTE_A4,   150, 
+                               NOTE_B4,   150, 
+                               TONES_REPEAT};
+
+void playTitleTune(void)
+{
+  playTones(titleTones, 9);
+}
 
 void overlaybitmap(uint8_t x, uint8_t y, const unsigned char * bmp,
                    uint16_t i, uint8_t width, uint8_t lines) {
