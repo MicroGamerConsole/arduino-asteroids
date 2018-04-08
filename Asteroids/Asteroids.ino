@@ -578,10 +578,7 @@ void loop() {
 
   drawExplosions();
 
-  if (scored || (clock % 10 == 0)) {
-    displayScore();
-    scored = false;
-  }
+  displayScore();
 
   if (nAsteroids == 0) {
     for (byte k = 0; k < MAX_SHOTS; k++) {
@@ -638,7 +635,7 @@ void displayScore() {
   arduboy.print(s);
   // tv.print(0, 0, s);
   for (i = 0; i < remainingShips; i++) {
-    overlaybitmap(i * 6, 6, ship_bitmaps, 0, 0, 0);
+    overlaybitmap(i * 6, 7, ship_bitmaps, 0, 0, 0);
   }
 
 }
