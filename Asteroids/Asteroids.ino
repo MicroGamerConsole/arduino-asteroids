@@ -33,6 +33,9 @@
 #define W (WIDTH)
 #define H (HEIGHT)
 
+#define BASE_FRAME_RATE (15)
+#define MENU_FRAME_RATE (8)
+
 #define NBR_HIGH_SCORES (7)
 
 Arduboy2 arduboy;
@@ -107,7 +110,7 @@ void setup()  {
   //}
 
   arduboy.boot();
-
+  arduboy.setFrameRate(BASE_FRAME_RATE);
   arduboy.setTextSize(1);
   arduboy.setTextColor(WHITE);
   arduboy.setTextColor(BLACK);
@@ -456,6 +459,10 @@ void heartbeat() {
 void loop() {
   char d;
   boolean killed = false;
+
+  if (!arduboy.nextFrame()) {
+    return; // go back to the start of the loop
+  }
 
   clock++;
 
@@ -1222,14 +1229,8 @@ void gameOver() {
   // strcpy_P(s, (char *)pgm_read_word(&(strings[2])));
 
   arduboy.setTextColor(WHITE);
-  arduboy.setCursor(40, 40);
-  arduboy.print("GAME");
-  // tv.print(40, 40, s);
-  //  strcpy_P(s, (char *)pgm_read_word(&(strings[3])));
-
-  arduboy.setCursor(72,40);
-  arduboy.print("OVER");
-  // tv.print(72, 40, s);
+  arduboy.setCursor(35, 40);
+  arduboy.print("GAME OVER");
 
   sprintf(s, "%u", score);
   arduboy.setCursor(40,20);
@@ -1242,7 +1243,10 @@ void gameOver() {
 }
 
 void enterInitials() {
-  char index = 0;
+  int index = 0;
+
+  // Lower the frame rate otherwise the intials input is too fast
+  arduboy.setFrameRate(MENU_FRAME_RATE);
 
   arduboy.fillScreen(BLACK);
   // tv.fill(0);
@@ -1266,6 +1270,10 @@ void enterInitials() {
   delay(300);
 
   while (true) {
+    if (!arduboy.nextFrame()) {
+      continue; // go back to the start of the loop
+    }
+
     arduboy.setCursor(56, 20);
     arduboy.print(initials[0]);
     // tv.print_char(56, 20, initials[0]);
@@ -1341,12 +1349,14 @@ void enterInitials() {
         playTone(1046, 20);
       } else {
         playTone(1046, 20);
+
+        // Go back to standard frame rate
+        arduboy.setFrameRate(BASE_FRAME_RATE);
         return;
       }
     }
     arduboy.display();
   }
-
 }
 
 void enterHighScore(byte file) {
@@ -1486,7 +1496,7 @@ void initGame(boolean start) {
       start = displayHighScores(1);
     }
   }
- 
+
   arduboy.fillScreen(BLACK);
   // tv.fill(0);
 
