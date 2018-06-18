@@ -26,8 +26,8 @@
 #include "ship_explosion_bitmaps.h"
 #include "explosion_frequencies.h"
 #include "asteroids_font.h"
-#include <Arduboy2.h>
-#include "ArduboyTones.h"
+#include <MicroGamer.h>
+#include "MicroGamerTones.h"
 #include <MicroGamerMemoryCard.h>
 
 #define W (WIDTH)
@@ -38,8 +38,8 @@
 
 #define NBR_HIGH_SCORES (7)
 
-Arduboy2 arduboy;
-ArduboyTones audio(arduboy.audio.enabled);
+MicroGamer arduboy;
+MicroGamerTones audio(arduboy.audio.enabled);
 MicroGamerMemoryCard mem(64/4);
 
 //#define DEBUG
