@@ -139,7 +139,7 @@ int rightPressed() {
 }
 
 int firePressed() {
-  return arduboy.pressed(A_BUTTON);
+  return arduboy.pressed(Y_BUTTON);
 }
 
 void drawAsteroid(Asteroid a) {
